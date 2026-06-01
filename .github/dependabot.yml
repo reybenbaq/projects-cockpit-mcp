@@ -1,0 +1,17 @@
+version: 2
+updates:
+  # Refresh the base-image digest pin (docker_standards §10) on a cadence.
+  - package-ecosystem: docker
+    directory: "/"
+    schedule:
+      interval: weekly
+  # Keep the MCP SDK and dev dependencies current within the pinned ranges.
+  - package-ecosystem: pip
+    directory: "/"
+    schedule:
+      interval: weekly
+  # Keep CI action SHA pins current (bumps the SHA and its version comment).
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly

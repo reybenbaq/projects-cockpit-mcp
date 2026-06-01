@@ -1,0 +1,47 @@
+# Locked runtime dependency closure for the Docker image (docker_standards §10).
+# Resolved from the declared ranges in pyproject.toml (mcp[cli], uvicorn) for the
+# linux python:3.12 runtime, pinned to exact versions so the same source builds
+# the same image. Local development installs the pyproject ranges via
+# `pip install -e ".[dev]"`; this file locks only the container build.
+#
+# Regenerate after a dependency bump:
+#   pip install --dry-run --ignore-installed --report report.json \
+#       'mcp[cli]>=1.25,<2.0' 'uvicorn>=0.30'
+#   then emit name==version for each entry in report.json["install"].
+# Dependabot (.github/dependabot.yml, pip ecosystem) keeps these current.
+annotated-doc==0.0.4
+annotated-types==0.7.0
+anyio==4.13.0
+attrs==26.1.0
+certifi==2026.5.20
+cffi==2.0.0
+click==8.4.1
+cryptography==48.0.0
+h11==0.16.0
+httpcore==1.0.9
+httpx==0.28.1
+httpx-sse==0.4.3
+idna==3.17
+jsonschema==4.26.0
+jsonschema-specifications==2025.9.1
+markdown-it-py==4.2.0
+mcp==1.27.2
+mdurl==0.1.2
+pycparser==3.0
+pydantic==2.13.4
+pydantic-core==2.46.4
+pydantic-settings==2.14.1
+pygments==2.20.0
+pyjwt==2.13.0
+python-dotenv==1.2.2
+python-multipart==0.0.30
+referencing==0.37.0
+rich==15.0.0
+rpds-py==2026.5.1
+shellingham==1.5.4
+sse-starlette==3.4.4
+starlette==1.2.1
+typer==0.26.4
+typing-extensions==4.15.0
+typing-inspection==0.4.2
+uvicorn==0.48.0

@@ -30,6 +30,6 @@ packages = ["src/cockpit"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "--strict-markers --tb=short"
+addopts = "--strict-markers --tb=short --cov=cockpit --cov-branch --cov-report=term-missing --cov-fail-under=85"
 asyncio_mode = "auto"
 pythonpath = ["src"]

@@ -21,6 +21,17 @@ PROTOCOL_REVISION = "2025-11-25"
 _REQUIRED = ("PROJECTS_ROOT", "COCKPIT_TOKEN")
 _VALID_LOG_LEVELS = frozenset({"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"})
 
+# Loopback defaults for the transport-layer DNS-rebinding guard. These mirror
+# what FastMCP would auto-enable for a localhost bind, but we set them
+# explicitly (see server.build_server) so the posture is visible, intentional,
+# and stable regardless of the bind interface (the container binds 0.0.0.0).
+_DEFAULT_ALLOWED_HOSTS = ("127.0.0.1:*", "localhost:*", "[::1]:*")
+_DEFAULT_ALLOWED_ORIGINS = (
+    "http://127.0.0.1:*",
+    "http://localhost:*",
+    "http://[::1]:*",
+)
+
 
 @dataclass(frozen=True)
 class Config:
@@ -33,9 +44,16 @@ class Config:
         token: Bearer token required on every HTTP request.
         host: Bind address. Local servers bind loopback only.
         port: Bind port (>= 1024 so the container can run non-root).
-        allowed_origins: Browser ``Origin`` values permitted. A request
-            carrying an ``Origin`` not in this set is rejected (403). A
-            request with no ``Origin`` (a non-browser client) is allowed.
+        allowed_origins: Browser ``Origin`` values the transport accepts
+            (DNS-rebinding defense, MCP overlay §6/§11.1). A request whose
+            ``Origin`` is not in this set is rejected (403); a request with
+            no ``Origin`` (a non-browser client like Claude Code) is allowed.
+            Defaults to loopback origins; an explicit empty value rejects all
+            browser Origins.
+        allowed_hosts: ``Host`` header values the transport accepts. A
+            request whose ``Host`` is not in this set is rejected (421).
+            Defaults to loopback hosts. Widen this only to expose the server
+            beyond loopback, and adopt the OAuth path (see README) when you do.
         max_search_hits: Hard ceiling on ``memory_search`` results.
         log_level: Root log level name.
     """
@@ -45,12 +63,24 @@ class Config:
     token: str
     host: str = "127.0.0.1"
     port: int = 8848
-    allowed_origins: frozenset[str] = field(default_factory=frozenset)
+    allowed_origins: frozenset[str] = field(
+        default_factory=lambda: frozenset(_DEFAULT_ALLOWED_ORIGINS)
+    )
+    allowed_hosts: frozenset[str] = field(
+        default_factory=lambda: frozenset(_DEFAULT_ALLOWED_HOSTS)
+    )
     max_search_hits: int = 50
     log_level: str = "INFO"
 
 
-def _split_origins(raw: str) -> frozenset[str]:
+def _split_set(raw: str | None, default: tuple[str, ...]) -> frozenset[str]:
+    """Parse a comma-separated env value, or fall back to ``default`` when unset.
+
+    An explicitly empty value ("") yields an empty set — a deliberate
+    "reject all" override, distinct from leaving the variable unset.
+    """
+    if raw is None:
+        return frozenset(default)
     return frozenset(part.strip() for part in raw.split(",") if part.strip())
 
 
@@ -95,7 +125,8 @@ def load_config(environ: dict[str, str] | None = None) -> Config:
         token=env["COCKPIT_TOKEN"],
         host=env.get("HOST", "127.0.0.1"),
         port=port,
-        allowed_origins=_split_origins(env.get("ALLOWED_ORIGINS", "")),
+        allowed_origins=_split_set(env.get("ALLOWED_ORIGINS"), _DEFAULT_ALLOWED_ORIGINS),
+        allowed_hosts=_split_set(env.get("ALLOWED_HOSTS"), _DEFAULT_ALLOWED_HOSTS),
         max_search_hits=max_hits,
         log_level=log_level,
     )

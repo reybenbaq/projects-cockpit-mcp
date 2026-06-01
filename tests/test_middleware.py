@@ -1,11 +1,14 @@
-"""ASGI security-middleware tests: bearer auth, Origin gate, healthz, passthrough."""
+"""ASGI security-middleware tests: bearer auth, healthz, passthrough.
+
+Host and Origin validation lives in the SDK transport layer (configured in
+build_server), so it is exercised in test_server.py, not here.
+"""
 
 from __future__ import annotations
 
 from cockpit.middleware import SecurityMiddleware
 
 TOKEN = "secret-token"
-ALLOWED = frozenset({"https://ok.example"})
 
 
 class DummyApp:
@@ -39,7 +42,7 @@ def _http(path="/mcp", headers=None):
 
 
 def _mw(inner):
-    return SecurityMiddleware(inner, token=TOKEN, allowed_origins=ALLOWED)
+    return SecurityMiddleware(inner, token=TOKEN)
 
 
 async def test_missing_token_is_401() -> None:
@@ -63,32 +66,6 @@ async def test_wrong_token_is_401() -> None:
     status = await _drive(_mw(inner), scope)
     assert status == 401
     assert inner.called is False
-
-
-async def test_disallowed_origin_is_403() -> None:
-    inner = DummyApp()
-    scope = _http(
-        headers=[
-            (b"authorization", b"Bearer secret-token"),
-            (b"origin", b"https://evil.example"),
-        ]
-    )
-    status = await _drive(_mw(inner), scope)
-    assert status == 403
-    assert inner.called is False
-
-
-async def test_allowed_origin_passes() -> None:
-    inner = DummyApp()
-    scope = _http(
-        headers=[
-            (b"authorization", b"Bearer secret-token"),
-            (b"origin", b"https://ok.example"),
-        ]
-    )
-    status = await _drive(_mw(inner), scope)
-    assert status == 200
-    assert inner.called is True
 
 
 async def test_healthz_bypasses_auth() -> None:

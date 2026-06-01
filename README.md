@@ -30,7 +30,7 @@ src/cockpit/
   gitinfo.py      git via subprocess argument lists (no shell)
   search.py       pure-Python memory grep (no ripgrep dependency)
   security.py     path-containment guard (traversal defense)
-  middleware.py   ASGI Origin + bearer-token enforcement
+  middleware.py   ASGI bearer-token enforcement
   models.py       dataclass output schemas
 ```
 
@@ -83,8 +83,8 @@ This server runs **locally** (a container published on host loopback only), so i
 A **remote** deployment exposing anything beyond public data needs full OAuth 2.1 (PKCE, audience-bound tokens, Protected Resource Metadata). The official SDK supports this via `TokenVerifier` + `AuthSettings`. Swapping the static-token middleware for that path is the intended upgrade, out of scope for this local sample.
 
 Notes:
-- The middleware validates `Origin` on every request. It rejects a browser `Origin` that is not in `ALLOWED_ORIGINS` (403). It allows a request with no `Origin` (a non-browser client).
-- Token comparison runs in constant time (`hmac.compare_digest`).
+- Host and Origin validation (DNS-rebinding defense) is owned by the FastMCP transport layer, configured explicitly in `build_server`. By default it accepts only loopback Host and Origin headers. A request with no `Origin` (a non-browser client like Claude Code) is allowed. A disallowed `Origin` returns 403 and a disallowed `Host` returns 421. Widen `ALLOWED_HOSTS` and `ALLOWED_ORIGINS` only to expose the server beyond loopback, and adopt the OAuth path below when you do.
+- The ASGI middleware adds the one control the transport layer lacks: a bearer token, required on every request and compared in constant time (`hmac.compare_digest`).
 - The server resolves every caller-supplied project or file name and checks containment before any read (`security.resolve_within`). Discovery skips symlinks so a planted link cannot redirect a scan outside the workspace.
 - Git invocations use argument lists, never a shell string.
 

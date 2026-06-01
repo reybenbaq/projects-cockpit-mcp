@@ -1,13 +1,10 @@
 """ASGI security middleware for the streamable-HTTP transport.
 
-Enforces the two MCP local-HTTP requirements (overlay §6, §11.1) that the
-FastMCP app does not impose on its own:
-
-* ``Origin`` validation — a request carrying a browser ``Origin`` not in the
-  allowlist is rejected with 403 (DNS-rebinding defense). A request with no
-  ``Origin`` header (a non-browser client such as Claude Code) is allowed.
-* Bearer token — every request must carry ``Authorization: Bearer <token>``
-  matching the configured token, compared in constant time.
+Adds the one control the FastMCP transport layer does not provide: a static
+bearer token, required on every request and compared in constant time. Host
+and Origin validation (DNS-rebinding defense, MCP overlay §6/§11.1) is handled
+by the SDK's transport security, configured in
+:func:`cockpit.server.build_server` — so it is not duplicated here.
 
 ``/healthz`` is exempt so container orchestrators can probe liveness without
 the token. Implemented as raw ASGI (not ``BaseHTTPMiddleware``) so streamed
@@ -30,12 +27,11 @@ HEALTH_PATH = "/healthz"
 
 
 class SecurityMiddleware:
-    """Wraps an ASGI app with Origin + bearer-token enforcement."""
+    """Wraps an ASGI app with bearer-token enforcement."""
 
-    def __init__(self, app, *, token: str, allowed_origins: frozenset[str]) -> None:
+    def __init__(self, app, *, token: str) -> None:
         self.app = app
         self._token = token
-        self._allowed_origins = allowed_origins
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         if scope["type"] != "http":
@@ -48,12 +44,6 @@ class SecurityMiddleware:
             return
 
         headers = {k.lower(): v for k, v in scope.get("headers", [])}
-
-        origin = headers.get(b"origin")
-        if origin is not None and origin.decode("latin-1") not in self._allowed_origins:
-            logger.warning("Rejected request: disallowed Origin")
-            await _send_text(send, 403, "forbidden origin")
-            return
 
         if not self._authorized(headers.get(b"authorization")):
             await _send_text(
