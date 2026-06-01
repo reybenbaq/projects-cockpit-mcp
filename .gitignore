@@ -1,0 +1,23 @@
+# secrets / local config
+.env
+
+# local Claude Code workspace state (never published)
+.claude/
+
+# python
+__pycache__/
+*.pyc
+.venv/
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# editor & OS
+.idea/
+.vscode/
+.DS_Store

@@ -1,0 +1,35 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "projects-cockpit-mcp"
+version = "0.1.0"
+description = "Read-only MCP server giving an AI host live awareness of a multi-project Claude Code workspace."
+readme = "README.md"
+requires-python = ">=3.12"
+license = "MIT"
+dependencies = [
+    # >=1.25 guarantees protocol 2025-11-25 (SDK's own v1 guidance); <2.0 blocks v2 breaking changes.
+    "mcp[cli]>=1.25,<2.0",
+    "uvicorn>=0.30",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8",
+    "pytest-asyncio>=0.24",
+    "pytest-cov>=7.1",
+]
+
+[project.scripts]
+projects-cockpit = "cockpit.server:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/cockpit"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "--strict-markers --tb=short"
+asyncio_mode = "auto"
+pythonpath = ["src"]

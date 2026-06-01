@@ -1,0 +1,35 @@
+name: projects-cockpit
+
+services:
+  cockpit:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: projects-cockpit-mcp:dev
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      # Inside the container the workspace is always mounted at /workspace.
+      PROJECTS_ROOT: /workspace
+      MEMORY_ROOT: /workspace
+      HOST: 0.0.0.0
+      PORT: "8848"
+    ports:
+      # Published on host loopback only — never exposed to the network.
+      - "127.0.0.1:8848:8848"
+    volumes:
+      # PROJECTS_ROOT_HOST comes from .env; mounted read-only.
+      - "${PROJECTS_ROOT_HOST:?set PROJECTS_ROOT_HOST in .env}:/workspace:ro"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8848/healthz', timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
