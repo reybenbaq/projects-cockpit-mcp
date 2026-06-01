@@ -122,3 +122,45 @@ def test_multiple_problems_aggregated() -> None:
     assert "missing required env vars" in msg
     assert "PORT" in msg
     assert "LOG_LEVEL" in msg
+
+
+def test_max_discovery_depth_default(tmp_path) -> None:
+    cfg = load_config(_env(tmp_path))
+    assert cfg.max_discovery_depth == 3
+
+
+def test_max_discovery_depth_explicit(tmp_path) -> None:
+    cfg = load_config(_env(tmp_path, MAX_DISCOVERY_DEPTH="2"))
+    assert cfg.max_discovery_depth == 2
+
+
+def test_max_discovery_depth_below_minimum_raises(tmp_path) -> None:
+    with pytest.raises(ConfigError) as exc:
+        load_config(_env(tmp_path, MAX_DISCOVERY_DEPTH="0"))
+    assert "MAX_DISCOVERY_DEPTH" in str(exc.value)
+
+
+def test_max_discovery_depth_above_maximum_raises(tmp_path) -> None:
+    with pytest.raises(ConfigError) as exc:
+        load_config(_env(tmp_path, MAX_DISCOVERY_DEPTH="11"))
+    assert "MAX_DISCOVERY_DEPTH" in str(exc.value)
+
+
+def test_require_markers_default_is_true(tmp_path) -> None:
+    cfg = load_config(_env(tmp_path))
+    assert cfg.require_markers is True
+
+
+def test_require_markers_false_from_env(tmp_path) -> None:
+    cfg = load_config(_env(tmp_path, REQUIRE_MARKERS="false"))
+    assert cfg.require_markers is False
+
+
+def test_require_markers_true_explicit(tmp_path) -> None:
+    cfg = load_config(_env(tmp_path, REQUIRE_MARKERS="true"))
+    assert cfg.require_markers is True
+
+
+def test_require_markers_case_insensitive(tmp_path) -> None:
+    cfg = load_config(_env(tmp_path, REQUIRE_MARKERS="FALSE"))
+    assert cfg.require_markers is False

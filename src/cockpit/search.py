@@ -8,6 +8,7 @@ scoped and fast even when ``memory_root`` is a large tree.
 from __future__ import annotations
 
 import logging
+import os
 from collections.abc import Iterator
 from pathlib import Path
 
@@ -20,6 +21,32 @@ logger = logging.getLogger(__name__)
 _EXACT_NAMES = frozenset({"MEMORY.md", "MEMORY_ARCHIVE.md", "MEMORY_DOMAINS.md"})
 _PREFIXES = ("feedback", "reference", "project", "user", "algorithm_decisions")
 _SNIPPET_MAX = 200
+
+# Directories that are never descended into during memory search. These
+# account for the dominant sources of false positives and slow NTFS-over-WSL2
+# traversal: vendored packages, build artifacts, and corpus directories that
+# contain many .md files but zero memory-convention files.
+_SEARCH_EXCLUDED_DIRS: frozenset[str] = frozenset(
+    {
+        ".git",
+        ".venv",
+        "venv",
+        "env",
+        "node_modules",
+        "__pycache__",
+        ".mypy_cache",
+        ".pytest_cache",
+        ".ruff_cache",
+        "dist",
+        "build",
+        ".build",
+        "secrets.local",
+        "tools",
+        "vendor-docs",
+        "audit",
+        "meta-architecture",
+    }
+)
 
 
 def search_memory(
@@ -58,18 +85,48 @@ def search_memory(
 
 
 def _iter_memory_files(memory_root: Path, scope: str | None = None) -> Iterator[Path]:
+    """Yield memory-convention ``.md`` files under ``memory_root``.
+
+    Uses :func:`os.walk` with in-place ``dirs[:]`` pruning to skip excluded
+    directories (vendored packages, build artifacts, git objects) rather than
+    the unbounded ``rglob`` it replaces. On NTFS-over-WSL2, descending into
+    ``.venv/`` or ``node_modules/`` can add thousands of irrelevant files and
+    tens of seconds of I/O; pruning those subtrees keeps the scan fast.
+    """
     scope_lower = scope.lower() if scope else None
-    for path in memory_root.rglob("*.md"):
-        if path.is_symlink() or not path.is_file():
-            continue
-        if not is_within(memory_root, path):
-            continue  # rglob may descend into a symlinked dir pointing outside
-        name = path.name
-        if not (name in _EXACT_NAMES or name.startswith(_PREFIXES)):
-            continue
-        if scope_lower and not name.lower().startswith(scope_lower):
-            continue
-        yield path
+    root_str = str(memory_root)
+    for dirpath, dirnames, filenames in os.walk(root_str, followlinks=False):
+        current = Path(dirpath)
+
+        # Prune by explicit name set so os.walk never descends into vendored
+        # packages, build artefacts, or git objects.  Do NOT prune by the
+        # leading-dot ("hidden") convention: agent memory lives under
+        # .claude/agent-memory/ paths and must be reachable.
+        dirnames[:] = [
+            d
+            for d in dirnames
+            if d not in _SEARCH_EXCLUDED_DIRS
+            and not d.startswith("sba-corpus-research")
+            and not d.startswith("_")
+        ]
+
+        for filename in filenames:
+            if not filename.endswith(".md"):
+                continue
+            path = current / filename
+            # Skip symlinks — they may point outside the root.
+            if path.is_symlink():
+                continue
+            if not path.is_file():
+                continue
+            if not is_within(memory_root, path):
+                continue
+            name = path.name
+            if not (name in _EXACT_NAMES or name.startswith(_PREFIXES)):
+                continue
+            if scope_lower and not name.lower().startswith(scope_lower):
+                continue
+            yield path
 
 
 def _matches_in_file(path: Path, needle: str) -> Iterator[tuple[int, str]]:

@@ -19,6 +19,7 @@ from .exceptions import ConfigError
 PROTOCOL_REVISION = "2025-11-25"
 
 _REQUIRED = ("PROJECTS_ROOT", "COCKPIT_TOKEN")
+_DEFAULT_MAX_DISCOVERY_DEPTH = 3
 _VALID_LOG_LEVELS = frozenset({"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"})
 
 # Loopback defaults for the transport-layer DNS-rebinding guard. These mirror
@@ -56,6 +57,16 @@ class Config:
             beyond loopback, and adopt the OAuth path (see README) when you do.
         max_search_hits: Hard ceiling on ``memory_search`` results.
         log_level: Root log level name.
+        max_discovery_depth: How many directory levels below ``projects_root``
+            to recurse when discovering projects (env: ``MAX_DISCOVERY_DEPTH``,
+            default 3). Covers L1/L2/L3 layouts; raising above 3 risks
+            descending into vendored subtrees.
+        require_markers: When ``True`` (default) only directories that carry a
+            qualifying marker (``.claude/agents/*.md``, valid ``.git``,
+            ``plans and validations/``, or ``implemented plans/``) are returned
+            as projects. Set ``REQUIRE_MARKERS=false`` to restore the old
+            flat-all-dirs behaviour (useful for demo / CI environments with
+            unmarked fixture trees).
     """
 
     projects_root: Path
@@ -71,6 +82,8 @@ class Config:
     )
     max_search_hits: int = 50
     log_level: str = "INFO"
+    max_discovery_depth: int = _DEFAULT_MAX_DISCOVERY_DEPTH
+    require_markers: bool = True
 
 
 def _split_set(raw: str | None, default: tuple[str, ...]) -> frozenset[str]:
@@ -109,12 +122,21 @@ def load_config(environ: dict[str, str] | None = None) -> Config:
     max_hits = _parse_int(
         env.get("MAX_SEARCH_HITS", "50"), "MAX_SEARCH_HITS", problems, minimum=1
     )
+    max_depth = _parse_int(
+        env.get("MAX_DISCOVERY_DEPTH", str(_DEFAULT_MAX_DISCOVERY_DEPTH)),
+        "MAX_DISCOVERY_DEPTH",
+        problems,
+        minimum=1,
+        maximum=10,
+    )
 
     log_level = env.get("LOG_LEVEL", "INFO").upper()
     if log_level not in _VALID_LOG_LEVELS:
         problems.append(
             f"LOG_LEVEL must be one of {sorted(_VALID_LOG_LEVELS)}, got: {log_level!r}"
         )
+
+    require_markers = _parse_bool(env.get("REQUIRE_MARKERS", "true"))
 
     if problems:
         raise ConfigError("Invalid configuration: " + "; ".join(problems))
@@ -129,6 +151,8 @@ def load_config(environ: dict[str, str] | None = None) -> Config:
         allowed_hosts=_split_set(env.get("ALLOWED_HOSTS"), _DEFAULT_ALLOWED_HOSTS),
         max_search_hits=max_hits,
         log_level=log_level,
+        max_discovery_depth=max_depth,
+        require_markers=require_markers,
     )
 
 
@@ -140,6 +164,15 @@ def _resolve_dir(raw: str | None, name: str, problems: list[str]) -> Path:
         problems.append(f"{name} is not an existing directory: {raw}")
         return path
     return path.resolve()
+
+
+def _parse_bool(raw: str) -> bool:
+    """Interpret a string env value as a boolean.
+
+    ``"true"`` / ``"1"`` / ``"yes"`` (case-insensitive) → ``True``.
+    Anything else → ``False``.
+    """
+    return raw.strip().lower() in ("true", "1", "yes")
 
 
 def _parse_int(

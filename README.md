@@ -17,7 +17,7 @@ Built on the official Python MCP SDK with **FastMCP**, served over **streamable-
 
 | Tool | Arguments | Returns |
 |---|---|---|
-| `list_projects` | (none) | Each top-level project with `has_agent` / `has_git` / `plan_count` / `is_dirty` flags |
+| `list_projects` | (none) | Each discovered project with `name` / `path` / `has_agent` / `has_git` / `plan_count` / `is_dirty` flags |
 | `list_agents` | `project?` | Subagent definitions (name, description, model) parsed from `.claude/agents/*.md` frontmatter |
 | `list_plans` | `status?`, `project?` | Plan documents and their `**Status:**` (DRAFT / APPROVED / IN PROGRESS / IMPLEMENTED / BLOCKED) |
 | `project_status` | `project`, `recent=5` | Git branch, dirty state, ahead/behind vs upstream, recent commits |
@@ -25,13 +25,63 @@ Built on the official Python MCP SDK with **FastMCP**, served over **streamable-
 
 All tools are read-only. There is no write path.
 
+### Relative-path tool inputs
+
+The `project` argument on `project_status`, `list_agents`, and `list_plans` takes the project's **relative path from `PROJECTS_ROOT`**:
+
+- Nested projects use their full relative path: `"GCP/Reviews Bot"`, `"Client/Acme Corp"`.
+- Top-level (L1) projects use their bare directory name: `"Wordpress"`, `"Standards Agent"`.
+- Bare leaf names are **not** resolved for nested projects — passing `"Reviews Bot"` when the project lives at `GCP/Reviews Bot` will not find it. Always pass the full relative path for nested projects.
+
+```
+project_status(project="GCP/Reviews Bot")    # nested — full relative path required
+project_status(project="Wordpress")          # L1 — bare name is the full relative path
+list_agents(project="GCP/Reviews Bot")
+list_plans(project="Client/Acme Corp")
+```
+
+The path must be relative (no leading `/`) and must not escape `PROJECTS_ROOT` via `..`. Absolute paths and traversal attempts are rejected.
+
+## Supported workspace layouts
+
+The cockpit supports both **flat** and **nested** directory layouts, and handles mixed/irregular trees.
+
+**Flat layout** (common for simple setups — all projects at the top level):
+```
+PROJECTS_ROOT/
+  My Bot/
+  My Website/
+  Shared Lib/
+```
+
+**Nested layout** (real multi-category workspaces with sub-categories):
+```
+PROJECTS_ROOT/
+  GCP/
+    Reviews Bot/          <-- discovered as "GCP/Reviews Bot"
+    Invoice Bot/          <-- discovered as "GCP/Invoice Bot"
+  Client/
+    Acme Corp/            <-- discovered as "Client/Acme Corp"
+  Standards Agent/        <-- discovered as "Standards Agent"
+  portfolio-samples/
+    projects-cockpit-mcp/ <-- discovered at depth 2
+```
+
+Discovery is marker-based and recursive up to `MAX_DISCOVERY_DEPTH` (default 3). A directory qualifies as a project when it carries at least one marker:
+
+- `.claude/agents/` with at least one `*.md` file
+- A valid `.git` repository (`.git/HEAD` is a regular file)
+- A `plans and validations/` or `implemented plans/` or `Plans/` subdirectory
+
+Both a parent directory and a nested child qualify simultaneously — no suppression. If `GCP/` itself carries an agent definition, it surfaces alongside `GCP/Reviews Bot`.
+
 ## Architecture
 
 ```
 src/cockpit/
   server.py       FastMCP instance, tool registration, ASGI app, main()
   config.py       env → frozen Config (load-once, fail-fast)
-  scanner.py      project / agent / plan filesystem scans
+  scanner.py      project / agent / plan filesystem scans (marker-based, recursive)
   gitinfo.py      git via subprocess argument lists (no shell)
   search.py       pure-Python memory grep (no ripgrep dependency)
   security.py     path-containment guard (traversal defense)
@@ -43,9 +93,30 @@ Tools are registered inside `build_server(config)` so they close over an injecte
 
 ### Design notes
 
+- Discovery uses a single `_iter_project_dirs` function shared by `list_projects`, `list_agents`, and `list_plans`. No duplication of traversal logic.
 - Tools that read the filesystem or run git are `async` and offload the blocking work with `anyio.to_thread.run_sync`. FastMCP runs sync tools directly on the event loop, so blocking there would stall every concurrent request.
 - Each tool returns a dataclass. FastMCP derives the `outputSchema` from it and emits both `structuredContent` and a text mirror.
 - The bearer middleware is raw ASGI, not Starlette's `BaseHTTPMiddleware`. That base class breaks streamed responses and swallows lifespan events, which the streamable-HTTP transport depends on.
+- `project_status` validates that the target directory is a real git repo (`.git/HEAD` is a file) before invoking any git subprocess. An empty or corrupted `.git` directory returns a `ToolError` rather than an unhandled subprocess failure.
+- `memory_search` uses `os.walk` with in-place directory pruning to skip excluded subtrees (`.venv/`, `node_modules/`, etc.) rather than an unbounded `rglob`. On NTFS-over-WSL2, this avoids traversing thousands of irrelevant files.
+
+## Configuration
+
+All configuration is loaded from environment variables at startup. Required variables are validated together and all problems are reported in a single error.
+
+| Variable | Default | Description |
+|---|---|---|
+| `PROJECTS_ROOT` | *required* | Directory scanned for projects, agents, and plans |
+| `COCKPIT_TOKEN` | *required* | Bearer token required on every HTTP request |
+| `MEMORY_ROOT` | `PROJECTS_ROOT` | Directory searched by `memory_search`. Set this explicitly when your memory files live in a different tree from your project code. When unset, the cockpit searches `PROJECTS_ROOT` — correct for workspace roots that contain both, but a `memory_search` pointed at a large code tree will be slower. |
+| `MAX_DISCOVERY_DEPTH` | `3` | How many directory levels below `PROJECTS_ROOT` to recurse. Covers L1/L2/L3 layouts; raising above 3 risks descending into vendored subdirectories. |
+| `REQUIRE_MARKERS` | `true` | When `true`, only directories with at least one project marker (agent def, git repo, plans dir) are returned. Set to `false` to surface all non-excluded directories regardless of markers — useful for flat demo or CI environments with minimal fixture trees. |
+| `PORT` | `8848` | Bind port (must be ≥ 1024 for non-root container operation) |
+| `HOST` | `127.0.0.1` | Bind address |
+| `ALLOWED_ORIGINS` | loopback origins | Comma-separated browser `Origin` values the transport accepts |
+| `ALLOWED_HOSTS` | loopback hosts | Comma-separated `Host` header values the transport accepts |
+| `MAX_SEARCH_HITS` | `50` | Hard ceiling on `memory_search` results |
+| `LOG_LEVEL` | `INFO` | Root log level (`DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL`) |
 
 ## Run in Docker
 
@@ -77,7 +148,7 @@ Add to your project `.mcp.json` (or `~/.claude.json` for user scope):
 }
 ```
 
-Then ask: *"Which plans are IN PROGRESS?"*, *"List my agents."*, *"Which repos are dirty?"*, *"Search memory for rate limits."*
+Then ask: *"Which plans are IN PROGRESS?"*, *"List my agents."*, *"Which repos are dirty?"*, *"Search memory for rate limits."*, *"What agents are in the GCP category?"*
 
 ## Local development
 
@@ -89,7 +160,7 @@ pytest --cov=cockpit         # with coverage
 
 ## Tests and supply-chain CI
 
-The suite is 57 tests: the scanner, search, git parsing, config boundaries, the transport-security 421 and 403 paths, the bearer middleware, and path-traversal plus symlink containment. CI enforces a branch-coverage gate. One test pins the protocol revision by asserting the SDK's `LATEST_PROTOCOL_VERSION` equals the value the README advertises.
+The suite is 87 tests: the scanner (flat and nested discovery, marker gate, depth limit, exclusions, capital-P plans dir, parent+child surfacing, path-qualified names), search (excluded-dir pruning), git parsing, config boundaries (including `MAX_DISCOVERY_DEPTH` and `REQUIRE_MARKERS`), the transport-security 421 and 403 paths, the bearer middleware, path-traversal plus symlink containment (including multi-segment inputs), and invalid-git graceful handling. CI enforces a branch-coverage gate. One test pins the protocol revision by asserting the SDK's `LATEST_PROTOCOL_VERSION` equals the value the README advertises.
 
 Every GitHub Actions step is pinned to a full commit SHA with a trailing version comment. The image-scan job builds the container and fails on any HIGH or CRITICAL vulnerability (Trivy). Dependabot keeps the SHA pins and the dependencies current.
 
@@ -104,7 +175,7 @@ A **remote** deployment exposing anything beyond public data needs full OAuth 2.
 Notes:
 - The FastMCP transport layer owns Host and Origin validation (the DNS-rebinding defense), configured explicitly in `build_server`. By default it accepts only loopback Host and Origin headers. A request with no `Origin` (a non-browser client like Claude Code) is allowed. A disallowed `Origin` returns 403 and a disallowed `Host` returns 421. Widen `ALLOWED_HOSTS` and `ALLOWED_ORIGINS` only to expose the server beyond loopback, and adopt the OAuth path below when you do.
 - The ASGI middleware adds the one control the transport layer lacks: a bearer token, required on every request and compared in constant time (`hmac.compare_digest`).
-- The server resolves every caller-supplied project or file name and checks containment before any read (`security.resolve_within`). Discovery skips symlinks so a planted link cannot redirect a scan outside the workspace.
+- The server resolves every caller-supplied project or file name and checks containment before any read (`security.resolve_within`). Discovery skips symlinks so a planted link cannot redirect a scan outside the workspace. Multi-segment relative paths (e.g. `"GCP/Reviews Bot"`) are supported; absolute paths and `..` traversals are rejected.
 - Git invocations use argument lists, never a shell string.
 
 ## License

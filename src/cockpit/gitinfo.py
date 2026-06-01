@@ -39,7 +39,13 @@ def _run_git(repo: Path, args: list[str]) -> str:
 
 
 def is_git_repo(path: Path) -> bool:
-    return (path / ".git").exists()
+    """Return True only when ``.git/HEAD`` is a regular file (valid repo).
+
+    Checking for the ``HEAD`` file rather than ``.git`` existence prevents
+    false positives from empty or corrupted ``.git`` directories, which
+    would make ``git rev-parse`` fail with an uncaught error downstream.
+    """
+    return (path / ".git" / "HEAD").is_file()
 
 
 def is_dirty(repo: Path) -> bool:

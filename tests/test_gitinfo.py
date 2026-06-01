@@ -44,6 +44,19 @@ def test_is_git_repo(git_repo: Path) -> None:
     assert gitinfo.is_git_repo(git_repo.parent) is False
 
 
+def test_empty_dot_git_dir_is_rejected(tmp_path: Path) -> None:
+    """An empty ``.git`` directory must not be treated as a valid repo.
+
+    The old ``.exists()`` check returned True for empty dirs, causing
+    ``git rev-parse`` to fail with an uncaught error. The new check requires
+    ``.git/HEAD`` to be a regular file.
+    """
+    fake = tmp_path / "fake_repo"
+    fake.mkdir()
+    (fake / ".git").mkdir()  # empty .git dir — no HEAD file
+    assert gitinfo.is_git_repo(fake) is False
+
+
 def test_clean_repo_status(git_repo: Path) -> None:
     status = gitinfo.get_status(git_repo)
     assert status.branch == "main"

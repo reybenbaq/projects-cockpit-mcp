@@ -67,18 +67,35 @@ def build_server(config: Config) -> FastMCP:
     @mcp.tool()
     async def list_projects() -> ProjectsResult:
         """List every project, flagging whether each has an agent, a git repo, plans, and uncommitted changes."""
-        projects = await anyio.to_thread.run_sync(
-            scanner.list_projects, config.projects_root
-        )
+
+        def _list() -> list:
+            return scanner.list_projects(
+                config.projects_root,
+                max_depth=config.max_discovery_depth,
+                require_markers=config.require_markers,
+            )
+
+        projects = await anyio.to_thread.run_sync(_list)
         return ProjectsResult(projects=projects)
 
     @mcp.tool()
     async def list_agents(project: str | None = None) -> AgentsResult:
-        """List Claude subagent definitions across all projects, or within one named project."""
+        """List Claude subagent definitions across all projects, or within one named project.
+
+        ``project`` accepts either a leaf name (``"My Project"``) or a
+        relative path from ``PROJECTS_ROOT`` (``"GCP/Reviews Bot"``).
+        """
         try:
-            agents = await anyio.to_thread.run_sync(
-                scanner.list_agents, config.projects_root, project
-            )
+
+            def _list() -> list:
+                return scanner.list_agents(
+                    config.projects_root,
+                    project=project,
+                    max_depth=config.max_discovery_depth,
+                    require_markers=config.require_markers,
+                )
+
+            agents = await anyio.to_thread.run_sync(_list)
             return AgentsResult(agents=agents)
         except CockpitError as e:
             raise ToolError(str(e)) from e
@@ -87,22 +104,50 @@ def build_server(config: Config) -> FastMCP:
     async def list_plans(
         status: str | None = None, project: str | None = None
     ) -> PlansResult:
-        """List plan documents and their lifecycle status (DRAFT, APPROVED, IN PROGRESS, IMPLEMENTED, BLOCKED). Optionally filter by status and/or project."""
+        """List plan documents and their lifecycle status (DRAFT, APPROVED, IN PROGRESS, IMPLEMENTED, BLOCKED). Optionally filter by status and/or project.
+
+        ``project`` accepts either a leaf name or a relative path from
+        ``PROJECTS_ROOT`` (e.g. ``"GCP/Reviews Bot"``).
+        """
         try:
-            plans = await anyio.to_thread.run_sync(
-                scanner.list_plans, config.projects_root, status, project
-            )
+
+            def _list() -> list:
+                return scanner.list_plans(
+                    config.projects_root,
+                    status=status,
+                    project=project,
+                    max_depth=config.max_discovery_depth,
+                    require_markers=config.require_markers,
+                )
+
+            plans = await anyio.to_thread.run_sync(_list)
             return PlansResult(plans=plans)
         except CockpitError as e:
             raise ToolError(str(e)) from e
 
     @mcp.tool()
     async def project_status(project: str, recent: int = 5) -> ProjectStatus:
-        """Report git status for one project: current branch, dirty state, ahead/behind vs upstream, and the most recent commits."""
+        """Report git status for one project: current branch, dirty state, ahead/behind vs upstream, and the most recent commits.
+
+        ``project`` accepts either a leaf name or a relative path from
+        ``PROJECTS_ROOT`` (e.g. ``"GCP/Reviews Bot"``).
+        """
 
         def _status() -> ProjectStatus:
             repo = resolve_within(config.projects_root, project)
-            return gitinfo.get_status(repo, recent=recent)
+            if not gitinfo.is_git_repo(repo):
+                raise CockpitError(
+                    f"project {project!r} does not contain a valid git repository"
+                )
+            status = gitinfo.get_status(repo, recent=recent)
+            # Echo the caller's normalized input, not the leaf directory name.
+            # For nested projects (e.g. "GCP/Reviews Bot") this ensures the
+            # returned `project` field matches the path the caller passed rather
+            # than surfacing only the leaf ("Reviews Bot").  For L1 projects the
+            # leaf name and the input are the same, so this is a no-op in that
+            # case.
+            status.project = project.strip()
+            return status
 
         try:
             return await anyio.to_thread.run_sync(_status)

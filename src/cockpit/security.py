@@ -25,6 +25,10 @@ def resolve_within(root: Path, name: str) -> Path:
     """
     if not name.strip() or name.strip() in (".", ".."):
         raise PathContainmentError(f"invalid path name: {name!r}")
+    if Path(name).is_absolute():
+        raise PathContainmentError(
+            f"path {name!r} resolves outside the allowed root"
+        )
     root_resolved = root.resolve()
     candidate = (root_resolved / name).resolve()
     if candidate != root_resolved and root_resolved not in candidate.parents:
