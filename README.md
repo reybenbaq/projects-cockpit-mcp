@@ -13,6 +13,8 @@ Built on the official Python MCP SDK with **FastMCP**, served over **streamable-
 - **SDK:** `mcp[cli] >=1.25,<2.0` (official Python MCP SDK)
 - **Transport:** streamable-HTTP, bound to loopback, bearer-token auth
 
+> This is a portfolio sample. It exists to show that I can design, harden, and ship a real MCP server end to end: official SDK, streamable-HTTP transport, hardened container, bearer auth, supply-chain CI, and a live-client integration test. It is also a tool I actually use, published as a runnable reference so you can clone it, bring it up, and connect Claude yourself. It is not a hosted service and not a maintained dependency.
+
 ## Tools
 
 | Tool | Arguments | Returns |
@@ -160,7 +162,7 @@ pytest --cov=cockpit         # with coverage
 
 ## Tests and supply-chain CI
 
-The suite is 87 tests: the scanner (flat and nested discovery, marker gate, depth limit, exclusions, capital-P plans dir, parent+child surfacing, path-qualified names), search (excluded-dir pruning), git parsing, config boundaries (including `MAX_DISCOVERY_DEPTH` and `REQUIRE_MARKERS`), the transport-security 421 and 403 paths, the bearer middleware, path-traversal plus symlink containment (including multi-segment inputs), and invalid-git graceful handling. CI enforces a branch-coverage gate. One test pins the protocol revision by asserting the SDK's `LATEST_PROTOCOL_VERSION` equals the value the README advertises.
+The suite is 92 tests: the scanner (flat and nested discovery, marker gate, depth limit, exclusions, capital-P plans dir, parent+child surfacing, path-qualified names), search (excluded-dir pruning), git parsing, config boundaries (including `MAX_DISCOVERY_DEPTH` and `REQUIRE_MARKERS`), the transport-security 421 and 403 paths, the bearer middleware, path-traversal plus symlink containment (including multi-segment inputs), and invalid-git graceful handling. CI enforces a branch-coverage gate. One test pins the protocol revision by asserting the SDK's `LATEST_PROTOCOL_VERSION` equals the value the README advertises.
 
 Every GitHub Actions step is pinned to a full commit SHA with a trailing version comment. The image-scan job builds the container and fails on any HIGH or CRITICAL vulnerability (Trivy). Dependabot keeps the SHA pins and the dependencies current.
 
