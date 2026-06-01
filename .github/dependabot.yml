@@ -5,11 +5,21 @@ updates:
     directory: "/"
     schedule:
       interval: weekly
+    ignore:
+      # Stay on the project's target runtime (pyproject requires-python >=3.12,
+      # CI tests 3.12). Take 3.12.x digest refreshes; a major jump is a
+      # deliberate, separately-validated change, not an auto-bump.
+      - dependency-name: "python"
+        update-types: ["version-update:semver-major"]
   # Keep the MCP SDK and dev dependencies current within the pinned ranges.
   - package-ecosystem: pip
     directory: "/"
     schedule:
       interval: weekly
+    ignore:
+      # pydantic exact-pins its compiled core (pydantic==X needs pydantic-core==Y);
+      # it can only move when pydantic itself bumps. Let pydantic carry it.
+      - dependency-name: "pydantic-core"
   # Keep CI action SHA pins current (bumps the SHA and its version comment).
   - package-ecosystem: github-actions
     directory: "/"
