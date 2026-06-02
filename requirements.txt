@@ -41,7 +41,7 @@ rpds-py==2026.5.1
 shellingham==1.5.4
 sse-starlette==3.4.4
 starlette==1.2.1
-typer==0.26.4
+typer==0.26.6
 typing-extensions==4.15.0
 typing-inspection==0.4.2
 uvicorn==0.48.0
