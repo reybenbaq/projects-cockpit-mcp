@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import pytest
+from mcp.server.fastmcp.exceptions import ToolError
 from mcp.server.transport_security import (
     TransportSecurityMiddleware,
     TransportSecuritySettings,
@@ -91,3 +93,123 @@ async def test_foreign_origin_returns_403() -> None:
     )
     assert result is not None
     assert result.status_code == 403
+
+
+# ---------------------------------------------------------------------------
+# Tool annotations — readOnlyHint and title
+# ---------------------------------------------------------------------------
+
+_READ_ONLY_TOOLS = {
+    "list_projects",
+    "list_agents",
+    "list_plans",
+    "project_status",
+    "memory_search",
+}
+
+
+async def test_all_tools_have_readonly_hint(tmp_path) -> None:
+    """Every tool must carry readOnlyHint=True so hosts can auto-allow reads."""
+    mcp = server.build_server(_config(tmp_path))
+    tools = await mcp.list_tools()
+    for tool in tools:
+        assert tool.annotations is not None, (
+            f"Tool {tool.name!r} has no annotations"
+        )
+        assert tool.annotations.readOnlyHint is True, (
+            f"Tool {tool.name!r} readOnlyHint is not True"
+        )
+
+
+async def test_all_tools_have_open_world_false(tmp_path) -> None:
+    """All tools operate on the local workspace — openWorldHint must be False."""
+    mcp = server.build_server(_config(tmp_path))
+    tools = await mcp.list_tools()
+    for tool in tools:
+        assert tool.annotations is not None
+        assert tool.annotations.openWorldHint is False, (
+            f"Tool {tool.name!r} openWorldHint is not False"
+        )
+
+
+async def test_all_tools_have_title(tmp_path) -> None:
+    """Every tool must have a human-readable title annotation."""
+    mcp = server.build_server(_config(tmp_path))
+    tools = await mcp.list_tools()
+    for tool in tools:
+        assert tool.annotations is not None
+        assert tool.annotations.title, (
+            f"Tool {tool.name!r} is missing a title annotation"
+        )
+
+
+# ---------------------------------------------------------------------------
+# Input schema — Field descriptions at the schema boundary
+# ---------------------------------------------------------------------------
+
+
+async def test_project_status_schema_has_param_descriptions(tmp_path) -> None:
+    """project and recent params must carry descriptions in the inputSchema."""
+    mcp = server.build_server(_config(tmp_path))
+    tools = await mcp.list_tools()
+    tool = next(t for t in tools if t.name == "project_status")
+    props = tool.inputSchema.get("properties", {})
+    assert "description" in props.get("project", {}), "project param missing description"
+    assert "description" in props.get("recent", {}), "recent param missing description"
+
+
+async def test_memory_search_schema_has_param_descriptions(tmp_path) -> None:
+    """query and scope params must carry descriptions in the inputSchema."""
+    mcp = server.build_server(_config(tmp_path))
+    tools = await mcp.list_tools()
+    tool = next(t for t in tools if t.name == "memory_search")
+    props = tool.inputSchema.get("properties", {})
+    assert "description" in props.get("query", {}), "query param missing description"
+    assert "description" in props.get("scope", {}), "scope param missing description"
+
+
+async def test_list_agents_schema_has_param_descriptions(tmp_path) -> None:
+    """project param must carry a description in the inputSchema."""
+    mcp = server.build_server(_config(tmp_path))
+    tools = await mcp.list_tools()
+    tool = next(t for t in tools if t.name == "list_agents")
+    props = tool.inputSchema.get("properties", {})
+    assert "description" in props.get("project", {}), "project param missing description"
+
+
+async def test_list_plans_schema_has_param_descriptions(tmp_path) -> None:
+    """status and project params must carry descriptions in the inputSchema."""
+    mcp = server.build_server(_config(tmp_path))
+    tools = await mcp.list_tools()
+    tool = next(t for t in tools if t.name == "list_plans")
+    props = tool.inputSchema.get("properties", {})
+    assert "description" in props.get("status", {}), "status param missing description"
+    assert "description" in props.get("project", {}), "project param missing description"
+
+
+# ---------------------------------------------------------------------------
+# Schema-boundary validation — Pydantic rejects bad input before the handler
+# ---------------------------------------------------------------------------
+
+
+async def test_project_status_rejects_non_integer_recent(tmp_path) -> None:
+    """Passing a non-integer for ``recent`` must fail at the schema boundary
+    (Pydantic validation error surfaced as ToolError), not inside the handler.
+    """
+    mcp = server.build_server(_config(tmp_path))
+    with pytest.raises(ToolError):
+        await mcp.call_tool("project_status", {"project": "any", "recent": "bad"})
+
+
+async def test_project_status_rejects_recent_below_minimum(tmp_path) -> None:
+    """``recent`` has a ge=1 constraint; zero must be rejected at the schema boundary."""
+    mcp = server.build_server(_config(tmp_path))
+    with pytest.raises(ToolError):
+        await mcp.call_tool("project_status", {"project": "any", "recent": 0})
+
+
+async def test_project_status_rejects_recent_above_maximum(tmp_path) -> None:
+    """``recent`` has a le=50 constraint; 51 must be rejected at the schema boundary."""
+    mcp = server.build_server(_config(tmp_path))
+    with pytest.raises(ToolError):
+        await mcp.call_tool("project_status", {"project": "any", "recent": 51})

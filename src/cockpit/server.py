@@ -9,12 +9,15 @@ from __future__ import annotations
 
 import logging
 import sys
+from typing import Annotated
 
 import anyio.to_thread
 import uvicorn
 from mcp.server.fastmcp import FastMCP
 from mcp.server.fastmcp.exceptions import ToolError
 from mcp.server.transport_security import TransportSecuritySettings
+from mcp.types import ToolAnnotations
+from pydantic import Field
 
 from . import gitinfo, scanner, search
 from .config import Config, load_config
@@ -64,7 +67,13 @@ def build_server(config: Config) -> FastMCP:
     # and pushes its blocking work to a thread via anyio.to_thread.run_sync
     # (mcp_standards.md §15 Common Pitfalls).
 
-    @mcp.tool()
+    @mcp.tool(
+        annotations=ToolAnnotations(
+            title="List Projects",
+            readOnlyHint=True,
+            openWorldHint=False,
+        )
+    )
     async def list_projects() -> ProjectsResult:
         """List every project, flagging whether each has an agent, a git repo, plans, and uncommitted changes."""
 
@@ -78,8 +87,26 @@ def build_server(config: Config) -> FastMCP:
         projects = await anyio.to_thread.run_sync(_list)
         return ProjectsResult(projects=projects)
 
-    @mcp.tool()
-    async def list_agents(project: str | None = None) -> AgentsResult:
+    @mcp.tool(
+        annotations=ToolAnnotations(
+            title="List Agents",
+            readOnlyHint=True,
+            openWorldHint=False,
+        )
+    )
+    async def list_agents(
+        project: Annotated[
+            str | None,
+            Field(
+                default=None,
+                description=(
+                    "Leaf name or relative path from PROJECTS_ROOT to scope the "
+                    "search to one project (e.g. \"My Project\" or \"GCP/Reviews Bot\"). "
+                    "Omit to list agents across all projects."
+                ),
+            ),
+        ] = None,
+    ) -> AgentsResult:
         """List Claude subagent definitions across all projects, or within one named project.
 
         ``project`` accepts either a leaf name (``"My Project"``) or a
@@ -100,9 +127,35 @@ def build_server(config: Config) -> FastMCP:
         except CockpitError as e:
             raise ToolError(str(e)) from e
 
-    @mcp.tool()
+    @mcp.tool(
+        annotations=ToolAnnotations(
+            title="List Plans",
+            readOnlyHint=True,
+            openWorldHint=False,
+        )
+    )
     async def list_plans(
-        status: str | None = None, project: str | None = None
+        status: Annotated[
+            str | None,
+            Field(
+                default=None,
+                description=(
+                    "Lifecycle status to filter by: DRAFT, APPROVED, IN PROGRESS, "
+                    "IMPLEMENTED, or BLOCKED. Case-insensitive. Omit to return all plans."
+                ),
+            ),
+        ] = None,
+        project: Annotated[
+            str | None,
+            Field(
+                default=None,
+                description=(
+                    "Leaf name or relative path from PROJECTS_ROOT to scope the "
+                    "search to one project (e.g. \"GCP/Reviews Bot\"). "
+                    "Omit to list plans across all projects."
+                ),
+            ),
+        ] = None,
     ) -> PlansResult:
         """List plan documents and their lifecycle status (DRAFT, APPROVED, IN PROGRESS, IMPLEMENTED, BLOCKED). Optionally filter by status and/or project.
 
@@ -125,8 +178,33 @@ def build_server(config: Config) -> FastMCP:
         except CockpitError as e:
             raise ToolError(str(e)) from e
 
-    @mcp.tool()
-    async def project_status(project: str, recent: int = 5) -> ProjectStatus:
+    @mcp.tool(
+        annotations=ToolAnnotations(
+            title="Project Status",
+            readOnlyHint=True,
+            openWorldHint=False,
+        )
+    )
+    async def project_status(
+        project: Annotated[
+            str,
+            Field(
+                description=(
+                    "Leaf name or relative path from PROJECTS_ROOT identifying the "
+                    "project (e.g. \"My Project\" or \"GCP/Reviews Bot\")."
+                )
+            ),
+        ],
+        recent: Annotated[
+            int,
+            Field(
+                default=5,
+                ge=1,
+                le=50,
+                description="Number of recent git commits to include in the result (1–50).",
+            ),
+        ] = 5,
+    ) -> ProjectStatus:
         """Report git status for one project: current branch, dirty state, ahead/behind vs upstream, and the most recent commits.
 
         ``project`` accepts either a leaf name or a relative path from
@@ -154,8 +232,30 @@ def build_server(config: Config) -> FastMCP:
         except CockpitError as e:
             raise ToolError(str(e)) from e
 
-    @mcp.tool()
-    async def memory_search(query: str, scope: str | None = None) -> SearchResult:
+    @mcp.tool(
+        annotations=ToolAnnotations(
+            title="Memory Search",
+            readOnlyHint=True,
+            openWorldHint=False,
+        )
+    )
+    async def memory_search(
+        query: Annotated[
+            str,
+            Field(description="Case-insensitive substring to search for in memory markdown files."),
+        ],
+        scope: Annotated[
+            str | None,
+            Field(
+                default=None,
+                description=(
+                    "Filename prefix to restrict the search (e.g. \"feedback\" searches "
+                    "only feedback_*.md files; \"reference\" searches only reference_*.md). "
+                    "Omit to search all memory files."
+                ),
+            ),
+        ] = None,
+    ) -> SearchResult:
         """Search memory markdown files (MEMORY.md, feedback_*, reference_*, project_*, user_*) for a case-insensitive substring. Pass scope (e.g. "feedback", "reference") to search only files whose name starts with that prefix."""
         return await anyio.to_thread.run_sync(
             search.search_memory,
