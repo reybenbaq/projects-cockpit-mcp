@@ -61,7 +61,7 @@ def search_memory(
     with that prefix (e.g. ``"feedback"``, ``"reference"``), case-insensitive.
     When unset, every memory-convention file under ``memory_root`` is searched.
     """
-    needle = query.casefold()
+    needle = query.casefold().strip()
     if not needle:
         return SearchResult(query=query, hits=[], truncated=False)
 

@@ -10,6 +10,9 @@ readme = "README.md"
 requires-python = ">=3.12"
 license = "MIT"
 dependencies = [
+    # anyio is used directly (anyio.to_thread.run_sync); declared explicitly so it
+    # is not silently dropped if mcp or uvicorn change their own dependency trees.
+    "anyio>=4.1",
     # >=1.25 guarantees protocol 2025-11-25 (SDK's own v1 guidance); <2.0 blocks v2 breaking changes.
     "mcp[cli]>=1.25,<2.0",
     "uvicorn>=0.30",

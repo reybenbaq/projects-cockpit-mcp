@@ -23,7 +23,8 @@ def resolve_within(root: Path, name: str) -> Path:
     Raises:
         PathContainmentError: if the resolved path is not within ``root``.
     """
-    if not name.strip() or name.strip() in (".", ".."):
+    name = name.strip()
+    if not name or name in (".", ".."):
         raise PathContainmentError(f"invalid path name: {name!r}")
     if Path(name).is_absolute():
         raise PathContainmentError(

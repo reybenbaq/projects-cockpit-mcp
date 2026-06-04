@@ -30,6 +30,10 @@ def test_empty_query_returns_nothing(projects_root: Path) -> None:
     assert search.search_memory(projects_root, "", max_hits=50).hits == []
 
 
+def test_whitespace_only_query_returns_nothing(projects_root: Path) -> None:
+    assert search.search_memory(projects_root, "   ", max_hits=50).hits == []
+
+
 def test_scope_narrows_to_prefix(projects_root: Path) -> None:
     result = search.search_memory(projects_root, "widgets", max_hits=50, scope="feedback")
     files = {hit.file for hit in result.hits}
