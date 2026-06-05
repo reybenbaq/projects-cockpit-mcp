@@ -25,7 +25,7 @@ Built on the official Python MCP SDK with **FastMCP**, served over **streamable-
 | `project_status` | `project`, `recent=5` | Git branch, dirty state, ahead/behind vs upstream, recent commits |
 | `memory_search` | `query`, `scope?` | Case-insensitive line matches across `MEMORY.md`, `feedback_*`, `reference_*`, `project_*`, `user_*`. `scope` narrows to files with that name prefix |
 
-All tools are read-only. There is no write path.
+All tools carry `readOnlyHint=True` and `openWorldHint=False` in their MCP annotations, so hosts that inspect tool metadata can auto-permit reads. There is no write path.
 
 ### Relative-path tool inputs
 
@@ -33,7 +33,7 @@ The `project` argument on `project_status`, `list_agents`, and `list_plans` take
 
 - Nested projects use their full relative path: `"GCP/Reviews Bot"`, `"Client/Acme Corp"`.
 - Top-level (L1) projects use their bare directory name: `"Wordpress"`, `"Standards Agent"`.
-- Bare leaf names are **not** resolved for nested projects — passing `"Reviews Bot"` when the project lives at `GCP/Reviews Bot` will not find it. Always pass the full relative path for nested projects.
+- Bare leaf names are **not** resolved for nested projects. Passing `"Reviews Bot"` when the project lives at `GCP/Reviews Bot` will not find it. Always pass the full relative path for nested projects.
 
 ```
 project_status(project="GCP/Reviews Bot")    # nested — full relative path required
@@ -48,7 +48,7 @@ The path must be relative (no leading `/`) and must not escape `PROJECTS_ROOT` v
 
 The cockpit supports both **flat** and **nested** directory layouts, and handles mixed/irregular trees.
 
-**Flat layout** (common for simple setups — all projects at the top level):
+**Flat layout** (all projects at the top level):
 ```
 PROJECTS_ROOT/
   My Bot/
@@ -75,7 +75,7 @@ Discovery is marker-based and recursive up to `MAX_DISCOVERY_DEPTH` (default 3).
 - A valid `.git` repository (`.git/HEAD` is a regular file)
 - A `plans and validations/` or `implemented plans/` or `Plans/` subdirectory
 
-Both a parent directory and a nested child qualify simultaneously — no suppression. If `GCP/` itself carries an agent definition, it surfaces alongside `GCP/Reviews Bot`.
+Both a parent directory and a nested child qualify simultaneously with no suppression. If `GCP/` itself carries an agent definition, it surfaces alongside `GCP/Reviews Bot`.
 
 ## Architecture
 
@@ -110,9 +110,9 @@ All configuration is loaded from environment variables at startup. Required vari
 |---|---|---|
 | `PROJECTS_ROOT` | *required* | Directory scanned for projects, agents, and plans |
 | `COCKPIT_TOKEN` | *required* | Bearer token required on every HTTP request |
-| `MEMORY_ROOT` | `PROJECTS_ROOT` | Directory searched by `memory_search`. Set this explicitly when your memory files live in a different tree from your project code. When unset, the cockpit searches `PROJECTS_ROOT` — correct for workspace roots that contain both, but a `memory_search` pointed at a large code tree will be slower. |
+| `MEMORY_ROOT` | `PROJECTS_ROOT` | Directory searched by `memory_search`. Set this explicitly when your memory files live in a different tree from your project code. When unset, the cockpit searches `PROJECTS_ROOT` (correct for workspace roots that contain both), but a `memory_search` pointed at a large code tree will be slower. |
 | `MAX_DISCOVERY_DEPTH` | `3` | How many directory levels below `PROJECTS_ROOT` to recurse. Covers L1/L2/L3 layouts; raising above 3 risks descending into vendored subdirectories. |
-| `REQUIRE_MARKERS` | `true` | When `true`, only directories with at least one project marker (agent def, git repo, plans dir) are returned. Set to `false` to surface all non-excluded directories regardless of markers — useful for flat demo or CI environments with minimal fixture trees. |
+| `REQUIRE_MARKERS` | `true` | When `true`, only directories with at least one project marker (agent def, git repo, plans dir) are returned. Set to `false` to surface all non-excluded directories regardless of markers. Useful for flat demo or CI environments with minimal fixture trees. |
 | `PORT` | `8848` | Bind port (must be ≥ 1024 for non-root container operation) |
 | `HOST` | `127.0.0.1` | Bind address |
 | `ALLOWED_ORIGINS` | loopback origins | Comma-separated browser `Origin` values the transport accepts |
@@ -162,7 +162,7 @@ pytest --cov=cockpit         # with coverage
 
 ## Tests and supply-chain CI
 
-The suite is 92 tests: the scanner (flat and nested discovery, marker gate, depth limit, exclusions, capital-P plans dir, parent+child surfacing, path-qualified names), search (excluded-dir pruning), git parsing, config boundaries (including `MAX_DISCOVERY_DEPTH` and `REQUIRE_MARKERS`), the transport-security 421 and 403 paths, the bearer middleware, path-traversal plus symlink containment (including multi-segment inputs), and invalid-git graceful handling. CI enforces a branch-coverage gate. One test pins the protocol revision by asserting the SDK's `LATEST_PROTOCOL_VERSION` equals the value the README advertises.
+The suite is 103 tests (87.44% branch coverage): the scanner (flat and nested discovery, marker gate, depth limit, exclusions, capital-P plans dir, parent+child surfacing, path-qualified names), search (excluded-dir pruning, whitespace-only query guard), git parsing, config boundaries (including `MAX_DISCOVERY_DEPTH` and `REQUIRE_MARKERS`), the transport-security 421 and 403 paths, the bearer middleware, path-traversal plus symlink containment (including multi-segment inputs), invalid-git graceful handling, tool annotations (`readOnlyHint=True`, `openWorldHint=False`, title present on every tool), and Pydantic schema-boundary validation (parameter descriptions in `inputSchema`, range constraints enforced before handler invocation). CI enforces an 85% branch-coverage gate. One test pins the protocol revision by asserting the SDK's `LATEST_PROTOCOL_VERSION` equals the value the README advertises.
 
 Every GitHub Actions step is pinned to a full commit SHA with a trailing version comment. The image-scan job builds the container and fails on any HIGH or CRITICAL vulnerability (Trivy). Dependabot keeps the SHA pins and the dependencies current.
 
