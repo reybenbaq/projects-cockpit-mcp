@@ -44,7 +44,7 @@ _INSTRUCTIONS = (
 def build_server(config: Config) -> FastMCP:
     """Create the FastMCP server with all tools bound to ``config``."""
     # Configure the transport-layer DNS-rebinding guard (Host + Origin
-    # validation, MCP overlay §6/§11.1) explicitly rather than leaning on
+    # validation) explicitly rather than leaning on
     # FastMCP's implicit localhost auto-enable. The implicit path keys off the
     # FastMCP constructor's host, which never sees the container's 0.0.0.0
     # bind, so it would silently pin the allow-list to loopback and 421 any
@@ -64,8 +64,7 @@ def build_server(config: Config) -> FastMCP:
     # Every tool does blocking I/O: filesystem walks and git subprocesses. The
     # SDK invokes a sync tool directly on the event loop (no worker offload), so
     # a slow scan would starve every other in-flight request. Each tool is async
-    # and pushes its blocking work to a thread via anyio.to_thread.run_sync
-    # (mcp_standards.md §15 Common Pitfalls).
+    # and pushes its blocking work to a thread via anyio.to_thread.run_sync.
 
     @mcp.tool(
         annotations=ToolAnnotations(
