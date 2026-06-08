@@ -1,8 +1,8 @@
 """Configuration loading — all environment reads happen here, once, at startup.
 
-Per the universal core: collect every missing required variable before
-failing, never read ``os.environ`` inside business logic, pass the frozen
-``Config`` object by dependency injection.
+Collects every missing required variable before failing so all errors surface
+at once. Never reads ``os.environ`` inside business logic; passes the frozen
+``Config`` object by dependency injection instead.
 """
 
 from __future__ import annotations
@@ -13,7 +13,7 @@ from pathlib import Path
 
 from .exceptions import ConfigError
 
-# Protocol revision this server is built and tested against (MCP overlay §1).
+# Protocol revision this server is built and tested against.
 # A smoke test asserts the pinned SDK's LATEST_PROTOCOL_VERSION equals this, so
 # the constant is an enforced contract rather than documentation.
 PROTOCOL_REVISION = "2025-11-25"
@@ -46,7 +46,7 @@ class Config:
         host: Bind address. Local servers bind loopback only.
         port: Bind port (>= 1024 so the container can run non-root).
         allowed_origins: Browser ``Origin`` values the transport accepts
-            (DNS-rebinding defense, MCP overlay §6/§11.1). A request whose
+            (DNS-rebinding defense). A request whose
             ``Origin`` is not in this set is rejected (403); a request with
             no ``Origin`` (a non-browser client like Claude Code) is allowed.
             Defaults to loopback origins; an explicit empty value rejects all
