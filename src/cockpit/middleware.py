@@ -2,7 +2,7 @@
 
 Adds the one control the FastMCP transport layer does not provide: a static
 bearer token, required on every request and compared in constant time. Host
-and Origin validation (DNS-rebinding defense, MCP overlay §6/§11.1) is handled
+and Origin validation (DNS-rebinding defense) is handled
 by the SDK's transport security, configured in
 :func:`cockpit.server.build_server` — so it is not duplicated here.
 
