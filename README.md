@@ -31,14 +31,14 @@ All tools carry `readOnlyHint=True` and `openWorldHint=False` in their MCP annot
 
 The `project` argument on `project_status`, `list_agents`, and `list_plans` takes the project's **relative path from `PROJECTS_ROOT`**:
 
-- Nested projects use their full relative path: `"GCP/Reviews Bot"`, `"Client/Acme Corp"`.
+- Nested projects use their full relative path: `"Automation/SalesBot"`, `"Client/Acme Corp"`.
 - Top-level (L1) projects use their bare directory name: `"Wordpress"`, `"Standards Agent"`.
-- Bare leaf names are **not** resolved for nested projects. Passing `"Reviews Bot"` when the project lives at `GCP/Reviews Bot` will not find it. Always pass the full relative path for nested projects.
+- Bare leaf names are **not** resolved for nested projects. Passing `"SalesBot"` when the project lives at `Automation/SalesBot` will not find it. Always pass the full relative path for nested projects.
 
 ```
-project_status(project="GCP/Reviews Bot")    # nested — full relative path required
-project_status(project="Wordpress")          # L1 — bare name is the full relative path
-list_agents(project="GCP/Reviews Bot")
+project_status(project="Automation/SalesBot")    # nested — full relative path required
+project_status(project="Wordpress")              # L1 — bare name is the full relative path
+list_agents(project="Automation/SalesBot")
 list_plans(project="Client/Acme Corp")
 ```
 
@@ -59,9 +59,9 @@ PROJECTS_ROOT/
 **Nested layout** (real multi-category workspaces with sub-categories):
 ```
 PROJECTS_ROOT/
-  GCP/
-    Reviews Bot/          <-- discovered as "GCP/Reviews Bot"
-    Invoice Bot/          <-- discovered as "GCP/Invoice Bot"
+  Automation/
+    SalesBot/             <-- discovered as "Automation/SalesBot"
+    ReportBot/            <-- discovered as "Automation/ReportBot"
   Client/
     Acme Corp/            <-- discovered as "Client/Acme Corp"
   Standards Agent/        <-- discovered as "Standards Agent"
@@ -75,7 +75,7 @@ Discovery is marker-based and recursive up to `MAX_DISCOVERY_DEPTH` (default 3).
 - A valid `.git` repository (`.git/HEAD` is a regular file)
 - A `plans and validations/` or `implemented plans/` or `Plans/` subdirectory
 
-Both a parent directory and a nested child qualify simultaneously with no suppression. If `GCP/` itself carries an agent definition, it surfaces alongside `GCP/Reviews Bot`.
+Both a parent directory and a nested child qualify simultaneously with no suppression. If `Automation/` itself carries an agent definition, it surfaces alongside `Automation/SalesBot`.
 
 ## Architecture
 
@@ -177,7 +177,7 @@ A **remote** deployment exposing anything beyond public data needs full OAuth 2.
 Notes:
 - The FastMCP transport layer owns Host and Origin validation (the DNS-rebinding defense), configured explicitly in `build_server`. By default it accepts only loopback Host and Origin headers. A request with no `Origin` (a non-browser client like Claude Code) is allowed. A disallowed `Origin` returns 403 and a disallowed `Host` returns 421. Widen `ALLOWED_HOSTS` and `ALLOWED_ORIGINS` only to expose the server beyond loopback, and adopt the OAuth path below when you do.
 - The ASGI middleware adds the one control the transport layer lacks: a bearer token, required on every request and compared in constant time (`hmac.compare_digest`).
-- The server resolves every caller-supplied project or file name and checks containment before any read (`security.resolve_within`). Discovery skips symlinks so a planted link cannot redirect a scan outside the workspace. Multi-segment relative paths (e.g. `"GCP/Reviews Bot"`) are supported; absolute paths and `..` traversals are rejected.
+- The server resolves every caller-supplied project or file name and checks containment before any read (`security.resolve_within`). Discovery skips symlinks so a planted link cannot redirect a scan outside the workspace. Multi-segment relative paths (e.g. `"Automation/SalesBot"`) are supported; absolute paths and `..` traversals are rejected.
 - Git invocations use argument lists, never a shell string.
 
 ## License

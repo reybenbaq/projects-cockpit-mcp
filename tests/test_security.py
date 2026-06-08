@@ -52,11 +52,11 @@ def test_is_within(projects_root: Path) -> None:
 
 
 def test_resolves_multi_segment_relative_path(projects_root: Path) -> None:
-    """A two-segment path ``"GCP/Reviews Bot"`` must resolve to a child of root."""
+    """A two-segment path ``"Automation/SalesBot"`` must resolve to a child of root."""
     # Create the two-level path so resolve() finds a real dir.
-    nested = projects_root / "GCP" / "Reviews Bot"
+    nested = projects_root / "Automation" / "SalesBot"
     nested.mkdir(parents=True)
-    resolved = resolve_within(projects_root, "GCP/Reviews Bot")
+    resolved = resolve_within(projects_root, "Automation/SalesBot")
     assert resolved == nested.resolve()
 
 

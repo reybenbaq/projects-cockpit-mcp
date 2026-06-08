@@ -110,7 +110,7 @@ def build_server(config: Config) -> FastMCP:
         """List Claude subagent definitions across all projects, or within one named project.
 
         ``project`` takes a relative path from ``PROJECTS_ROOT``. Nested projects
-        require the full relative path (e.g. ``"GCP/Reviews Bot"``); top-level
+        require the full relative path (e.g. ``"Automation/SalesBot"``); top-level
         projects use their bare directory name (e.g. ``"Wordpress"``).
         """
         try:
@@ -162,7 +162,7 @@ def build_server(config: Config) -> FastMCP:
         """List plan documents and their lifecycle status (DRAFT, APPROVED, IN PROGRESS, IMPLEMENTED, BLOCKED). Optionally filter by status and/or project.
 
         ``project`` takes a relative path from ``PROJECTS_ROOT``. Nested projects
-        require the full relative path (e.g. ``"GCP/Reviews Bot"``); top-level
+        require the full relative path (e.g. ``"Automation/SalesBot"``); top-level
         projects use their bare directory name (e.g. ``"Wordpress"``).
         """
         try:
@@ -212,7 +212,7 @@ def build_server(config: Config) -> FastMCP:
         """Report git status for one project: current branch, dirty state, ahead/behind vs upstream, and the most recent commits.
 
         ``project`` takes a relative path from ``PROJECTS_ROOT``. Nested projects
-        require the full relative path (e.g. ``"GCP/Reviews Bot"``); top-level
+        require the full relative path (e.g. ``"Automation/SalesBot"``); top-level
         projects use their bare directory name (e.g. ``"Wordpress"``).
         """
 
@@ -224,7 +224,7 @@ def build_server(config: Config) -> FastMCP:
                 )
             status = gitinfo.get_status(repo, recent=recent)
             # Echo the caller's normalized input, not the leaf directory name.
-            # For nested projects (e.g. "GCP/Reviews Bot") this ensures the
+            # For nested projects (e.g. "Automation/SalesBot") this ensures the
             # returned `project` field matches the path the caller passed rather
             # than surfacing only the leaf ("Reviews Bot").  For L1 projects the
             # leaf name and the input are the same, so this is a no-op in that

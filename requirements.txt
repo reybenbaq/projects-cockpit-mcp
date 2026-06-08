@@ -1,4 +1,4 @@
-# Locked runtime dependency closure for the Docker image (docker_standards §10).
+# Locked runtime dependency closure for the Docker image.
 # Resolved from the declared ranges in pyproject.toml (mcp[cli], uvicorn) for the
 # linux python:3.12 runtime, pinned to exact versions so the same source builds
 # the same image. Local development installs the pyproject ranges via

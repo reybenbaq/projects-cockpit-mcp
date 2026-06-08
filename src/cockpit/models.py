@@ -13,7 +13,7 @@ from dataclasses import dataclass, field
 @dataclass
 class ProjectInfo:
     name: str
-    path: str  # relative path from PROJECTS_ROOT, e.g. "GCP/Reviews Bot"
+    path: str  # relative path from PROJECTS_ROOT, e.g. "Automation/SalesBot"
     has_agent: bool
     has_git: bool
     plan_count: int

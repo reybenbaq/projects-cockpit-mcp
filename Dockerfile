@@ -1,8 +1,8 @@
 # syntax=docker/dockerfile:1.10
 
 # ---- builder: install the package + deps into an isolated prefix ----
-# python:3.12-slim pinned by digest for reproducible, supply-chain-safe builds
-# (docker_standards §10). Tag documents intent; the digest enforces it.
+# python:3.12-slim pinned by digest for reproducible, supply-chain-safe builds.
+# Tag documents intent; the digest enforces it.
 # Resolved 2026-06-01; refresh via Dependabot (.github/dependabot.yml) or:
 #   docker buildx imagetools inspect python:3.12-slim
 FROM python:3.12-slim@sha256:090ba77e2958f6af52a5341f788b50b032dd4ca28377d2893dcf1ecbdfdfe203 AS builder
@@ -10,8 +10,8 @@ FROM python:3.12-slim@sha256:090ba77e2958f6af52a5341f788b50b032dd4ca28377d2893dc
 WORKDIR /build
 
 # Locked dependency closure first: it changes rarely, so this layer caches
-# independently of source edits (docker_standards §2). requirements.txt pins
-# every transitive dep to an exact version for reproducible builds (§10).
+# independently of source edits. requirements.txt pins every transitive dep
+# to an exact version for reproducible builds.
 COPY requirements.txt ./
 RUN --mount=type=cache,target=/root/.cache/pip \
     pip install --no-cache-dir --prefix=/install -r requirements.txt
@@ -26,12 +26,11 @@ RUN --mount=type=cache,target=/root/.cache/pip \
 FROM python:3.12-slim@sha256:090ba77e2958f6af52a5341f788b50b032dd4ca28377d2893dcf1ecbdfdfe203 AS runtime
 
 # git is the one runtime binary the cockpit needs (read-only: status, log).
-# Deliberately not version-pinned (docker_standards §10/§422 leaves apt pinning
-# to "security-critical" packages, and its own examples install build tools
-# unpinned). The digest-pinned base is the durable supply-chain control, and
-# `apt-get update` pulls current security patches for git. An exact `git=<ver>`
-# pin rots fast: Debian rotates the package out of the repo on each CVE, which
-# would break clean clones with "version not found".
+# Deliberately not version-pinned. The digest-pinned base is the durable
+# supply-chain control, and `apt-get update` pulls current security patches
+# for git. An exact `git=<ver>` pin rots fast: Debian rotates the package
+# out of the repo on each CVE, which breaks clean clones with
+# "version not found".
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
     apt-get update && \

@@ -10,14 +10,13 @@ on:
 permissions:
   contents: read
 
-# Cancel superseded PR runs; let main-branch runs finish (github_actions_standards §8).
+# Cancel superseded PR runs; let main-branch runs finish.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
-# Actions are pinned to full commit SHAs with a trailing version comment
-# (github_actions_standards §2). Dependabot (.github/dependabot.yml) bumps the
-# SHA and the comment together.
+# Actions are pinned to full commit SHAs with a trailing version comment.
+# Dependabot (.github/dependabot.yml) bumps the SHA and the comment together.
 jobs:
   test:
     name: Tests

@@ -1,6 +1,6 @@
 version: 2
 updates:
-  # Refresh the base-image digest pin (docker_standards §10) on a cadence.
+  # Refresh the base-image digest pin on a cadence.
   - package-ecosystem: docker
     directory: "/"
     schedule:

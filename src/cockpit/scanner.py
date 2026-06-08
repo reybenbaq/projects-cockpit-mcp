@@ -19,8 +19,8 @@ behaviour (useful for demo / CI environments with minimal fixture trees).
 
 Both a parent directory and a nested child may qualify simultaneously (D2): no
 suppression is applied. Each is emitted as a distinct project with a
-path-qualified name so callers can distinguish e.g. ``GCP/Reviews Bot`` from a
-hypothetical ``Client/Reviews Bot``.
+path-qualified name so callers can distinguish e.g. ``Automation/SalesBot`` from a
+hypothetical ``Analytics/SalesBot``.
 """
 
 from __future__ import annotations
