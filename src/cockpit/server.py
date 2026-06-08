@@ -100,8 +100,9 @@ def build_server(config: Config) -> FastMCP:
             Field(
                 default=None,
                 description=(
-                    "Leaf name or relative path from PROJECTS_ROOT to scope the "
-                    "search to one project (e.g. \"My Project\" or \"GCP/Reviews Bot\"). "
+                    "Relative path from PROJECTS_ROOT to scope the search to one project. "
+                    "Nested projects require the full relative path (e.g. \"GCP/Reviews Bot\"); "
+                    "top-level projects use the bare directory name (e.g. \"Wordpress\"). "
                     "Omit to list agents across all projects."
                 ),
             ),
@@ -109,8 +110,9 @@ def build_server(config: Config) -> FastMCP:
     ) -> AgentsResult:
         """List Claude subagent definitions across all projects, or within one named project.
 
-        ``project`` accepts either a leaf name (``"My Project"``) or a
-        relative path from ``PROJECTS_ROOT`` (``"GCP/Reviews Bot"``).
+        ``project`` takes a relative path from ``PROJECTS_ROOT``. Nested projects
+        require the full relative path (e.g. ``"GCP/Reviews Bot"``); top-level
+        projects use their bare directory name (e.g. ``"Wordpress"``).
         """
         try:
 
@@ -150,8 +152,9 @@ def build_server(config: Config) -> FastMCP:
             Field(
                 default=None,
                 description=(
-                    "Leaf name or relative path from PROJECTS_ROOT to scope the "
-                    "search to one project (e.g. \"GCP/Reviews Bot\"). "
+                    "Relative path from PROJECTS_ROOT to scope the search to one project. "
+                    "Nested projects require the full relative path (e.g. \"GCP/Reviews Bot\"); "
+                    "top-level projects use the bare directory name (e.g. \"Wordpress\"). "
                     "Omit to list plans across all projects."
                 ),
             ),
@@ -159,8 +162,9 @@ def build_server(config: Config) -> FastMCP:
     ) -> PlansResult:
         """List plan documents and their lifecycle status (DRAFT, APPROVED, IN PROGRESS, IMPLEMENTED, BLOCKED). Optionally filter by status and/or project.
 
-        ``project`` accepts either a leaf name or a relative path from
-        ``PROJECTS_ROOT`` (e.g. ``"GCP/Reviews Bot"``).
+        ``project`` takes a relative path from ``PROJECTS_ROOT``. Nested projects
+        require the full relative path (e.g. ``"GCP/Reviews Bot"``); top-level
+        projects use their bare directory name (e.g. ``"Wordpress"``).
         """
         try:
 
@@ -190,8 +194,9 @@ def build_server(config: Config) -> FastMCP:
             str,
             Field(
                 description=(
-                    "Leaf name or relative path from PROJECTS_ROOT identifying the "
-                    "project (e.g. \"My Project\" or \"GCP/Reviews Bot\")."
+                    "Relative path from PROJECTS_ROOT identifying the project. "
+                    "Nested projects require the full relative path (e.g. \"GCP/Reviews Bot\"); "
+                    "top-level projects use the bare directory name (e.g. \"Wordpress\")."
                 )
             ),
         ],
@@ -207,8 +212,9 @@ def build_server(config: Config) -> FastMCP:
     ) -> ProjectStatus:
         """Report git status for one project: current branch, dirty state, ahead/behind vs upstream, and the most recent commits.
 
-        ``project`` accepts either a leaf name or a relative path from
-        ``PROJECTS_ROOT`` (e.g. ``"GCP/Reviews Bot"``).
+        ``project`` takes a relative path from ``PROJECTS_ROOT``. Nested projects
+        require the full relative path (e.g. ``"GCP/Reviews Bot"``); top-level
+        projects use their bare directory name (e.g. ``"Wordpress"``).
         """
 
         def _status() -> ProjectStatus:
